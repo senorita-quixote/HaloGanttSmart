@@ -1,9 +1,10 @@
 import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import '@/index.css';
 import App from '@/App';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { isLocalMode } from '@/lib/localMode';
 
 const Landing = lazy(() => import('@/pages/Landing'));
 const Callback = lazy(() => import('@/pages/Callback'));
@@ -24,7 +25,7 @@ createRoot(document.getElementById('root')!).render(
       <ErrorBoundary>
         <Suspense fallback={<Spinner />}>
           <Routes>
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={isLocalMode ? <Navigate to="/app" replace /> : <Landing />} />
           <Route path="/app" element={<App />} />
           <Route path="/callback" element={<Callback />} />
           <Route path="/share/:shareToken" element={<SharedView />} />

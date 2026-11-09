@@ -5,6 +5,7 @@ import type { Task, TimeScale } from '@/types';
 import { exportAsPng, exportAsPdf } from '@/utils/export';
 import { toastError, toastSuccess } from './Toast';
 import ShareDialog from './ShareDialog';
+import { isLocalMode } from '@/lib/localMode';
 
 interface Props {
   projectName: string;
@@ -266,24 +267,28 @@ export default memo(function Header({
           )}
         </div>
 
-        {/* Share */}
-        <button
-          onClick={() => setShowShareDialog(true)}
-          className="flex items-center gap-1.5 px-3 h-8 rounded-md bg-accent text-white text-xs font-medium hover:bg-accent-light transition-colors cursor-pointer"
-          title="Share roadmap"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="18" cy="5" r="3" />
-            <circle cx="6" cy="12" r="3" />
-            <circle cx="18" cy="19" r="3" />
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-            <line x1="15.41" y1="6.51" x2="8.59" y2="11.49" />
-          </svg>
-          Share
-        </button>
+        {/* Share (needs Supabase, so hidden in local mode) */}
+        {!isLocalMode && (
+          <>
+            <button
+              onClick={() => setShowShareDialog(true)}
+              className="flex items-center gap-1.5 px-3 h-8 rounded-md bg-accent text-white text-xs font-medium hover:bg-accent-light transition-colors cursor-pointer"
+              title="Share roadmap"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="11.49" />
+              </svg>
+              Share
+            </button>
 
-        {showShareDialog && (
-          <ShareDialog projectId={projectId} projectName={projectName} onClose={() => setShowShareDialog(false)} />
+            {showShareDialog && (
+              <ShareDialog projectId={projectId} projectName={projectName} onClose={() => setShowShareDialog(false)} />
+            )}
+          </>
         )}
 
         {/* Divider */}
@@ -298,42 +303,53 @@ export default memo(function Header({
           {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </button>
 
-        {/* Account menu */}
-        <div className="relative" ref={accountRef}>
-          <button
-            onClick={() => setShowAccountMenu((v) => !v)}
-            className={iconBtn}
-            title="Account"
+        {isLocalMode ? (
+          <span
+            className="px-2 h-6 flex items-center rounded text-[10px] font-medium uppercase tracking-wide text-text-secondary border border-border-primary"
+            title="Running with VITE_LINEAR_API_KEY. Share links and Plan vs Actual need Supabase."
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
-          {showAccountMenu && (
-            <div className="absolute top-full mt-1 right-0 bg-bg-card border border-border-secondary rounded-lg shadow-xl z-50 min-w-[180px] py-1">
+            Local mode
+          </span>
+        ) : (
+          <>
+            {/* Account menu */}
+            <div className="relative" ref={accountRef}>
               <button
-                onClick={() => {
-                  setShowAccountMenu(false);
-                  onDisconnectLinear();
-                }}
-                className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors cursor-pointer"
+                onClick={() => setShowAccountMenu((v) => !v)}
+                className={iconBtn}
+                title="Account"
               >
-                Disconnect Linear
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
               </button>
-              <div className="border-t border-border-primary my-0.5" />
-              <button
-                onClick={() => {
-                  setShowAccountMenu(false);
-                  onSignOut();
-                }}
-                className="w-full text-left px-3 py-2 text-xs text-urgent hover:bg-bg-hover transition-colors cursor-pointer"
-              >
-                Sign out
-              </button>
+              {showAccountMenu && (
+                <div className="absolute top-full mt-1 right-0 bg-bg-card border border-border-secondary rounded-lg shadow-xl z-50 min-w-[180px] py-1">
+                  <button
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      onDisconnectLinear();
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-hover transition-colors cursor-pointer"
+                  >
+                    Disconnect Linear
+                  </button>
+                  <div className="border-t border-border-primary my-0.5" />
+                  <button
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      onSignOut();
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-urgent hover:bg-bg-hover transition-colors cursor-pointer"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </header>
   );

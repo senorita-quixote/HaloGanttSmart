@@ -56,6 +56,16 @@ npm run dev
 
 Open [localhost:5173](http://localhost:5173). You'll need Supabase and Linear OAuth credentials — see [Environment Variables](#environment-variables) below.
 
+### Local mode (no Supabase)
+
+To try GanttSmart or work on it without setting up Supabase or a Linear OAuth app, create a [Linear personal API key](https://linear.app/settings/account/security) and put it in `.env`:
+
+```bash
+VITE_LINEAR_API_KEY=lin_api_...
+```
+
+Then run `npm run dev`. Sign-in is skipped and the app talks to Linear directly with your key. Share links and Plan vs Actual need Supabase, so they're hidden in this mode. Local mode only works under the dev server; production builds ignore the key.
+
 ---
 
 ## Tech Stack

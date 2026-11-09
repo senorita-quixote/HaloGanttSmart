@@ -7,7 +7,8 @@ import Header from '@/components/Header';
 import LinearConnect from '@/components/LinearConnect';
 import Onboarding from '@/components/Onboarding';
 import StatsRow from '@/components/StatsRow';
-import ToastContainer from '@/components/Toast';
+import ToastContainer, { toastError } from '@/components/Toast';
+import { isLocalMode, LOCAL_LINEAR_API_KEY } from '@/lib/localMode';
 import DetailPanel, { setRemoveRelationHandler, setBaselinesForPanel } from '@/components/DetailPanel';
 import MilestonePanel, { setMilestoneDateHandler } from '@/components/MilestonePanel';
 import { useAuth } from '@/hooks/useAuth';
@@ -184,7 +185,7 @@ function GanttView({
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
         showBaselines={showBaselines}
-        onShowBaselinesChange={handleShowBaselinesChange}
+        onShowBaselinesChange={isLocalMode ? undefined : handleShowBaselinesChange}
       />
 
       <StatsRow tasks={filteredTasks} />
@@ -220,6 +221,19 @@ function GanttView({
 }
 
 export default function App() {
+  return isLocalMode ? <LocalApp /> : <AuthenticatedApp />;
+}
+
+/** Local mode: skip sign-in and use the personal API key from .env. */
+function LocalApp() {
+  useTheme();
+  const onKeyRejected = useCallback(() => {
+    toastError('Linear rejected your API key. Check VITE_LINEAR_API_KEY in .env and restart npm run dev.');
+  }, []);
+  return <GanttView linearToken={LOCAL_LINEAR_API_KEY} onDisconnectLinear={onKeyRejected} onSignOut={() => {}} />;
+}
+
+function AuthenticatedApp() {
   const { user, loading, linearToken, signUp, signIn, signInWithGoogle, signInWithKeycloak, signOut, disconnectLinear } = useAuth();
 
   // Initialize theme on app load (applies class to <html> even on auth pages)
