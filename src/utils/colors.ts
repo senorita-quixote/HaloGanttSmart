@@ -54,3 +54,20 @@ export function priorityClass(val: number): string {
   if (val === 4) return 'low';
   return 'none';
 }
+
+/** Darken a #rrggbb color by mixing it with black (amount 0–1). */
+function darken(hex: string, amount: number): string {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const ch = (shift: number) => Math.round(((n >> shift) & 255) * (1 - amount));
+  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
+}
+
+/** Bar gradient and shadow for a custom color (e.g. a Linear label color), styled like the priority bars */
+export function customBarStyle(hex: string): { background: string; boxShadow: string } {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return { background: barGradients.none, boxShadow: barShadows.none };
+  const n = parseInt(hex.slice(1), 16);
+  return {
+    background: `linear-gradient(135deg, ${darken(hex, 0.3)}, ${hex})`,
+    boxShadow: `0 2px 8px rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},0.3)`,
+  };
+}

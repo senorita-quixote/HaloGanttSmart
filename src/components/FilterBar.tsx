@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
-import type { Filters, GroupBy, Project } from '@/types';
+import type { Filters, GroupBy, LabelGroup, Project } from '@/types';
 import { Avatar } from '@/utils/avatar';
 import CustomDropdown from './CustomDropdown';
 import type { DropdownOption } from './CustomDropdown';
 import DateRangePicker from './DateRangePicker';
+import LabelFilter from './LabelFilter';
+import { findLabel } from '@/utils/labels';
 
 interface Props {
   projects: Project[];
@@ -11,6 +13,11 @@ interface Props {
   onSelectProject: (id: string) => void;
   assignees: string[];
   statuses: string[];
+  /** Label groups for the label filter and bar coloring. Both controls are hidden when empty. */
+  labelGroups?: LabelGroup[];
+  /** Label group name whose label colors the bars, or '' for priority colors */
+  colorByGroup?: string;
+  onColorByGroupChange?: (group: string) => void;
   filters: Filters;
   onFiltersChange: (f: Filters) => void;
   totalCount: number;
@@ -89,6 +96,17 @@ function GroupIcon() {
   );
 }
 
+function PaletteIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted shrink-0">
+      <path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0022 9.8C22 5.5 17.5 2 12 2z" />
+      <circle cx="7.5" cy="10.5" r="1" />
+      <circle cx="10.5" cy="6.5" r="1" />
+      <circle cx="15.5" cy="6.5" r="1" />
+    </svg>
+  );
+}
+
 function BaselineIcon() {
   return (
     <svg width="14" height="10" viewBox="0 0 20 12" fill="none" className="shrink-0">
@@ -112,6 +130,9 @@ export default function FilterBar({
   onSelectProject,
   assignees,
   statuses,
+  labelGroups = [],
+  colorByGroup = '',
+  onColorByGroupChange,
   filters,
   onFiltersChange,
   totalCount,
@@ -132,9 +153,11 @@ export default function FilterBar({
   const hasSearch = !!filters.search;
   const hasAssignee = !!filters.assignee;
   const hasStatus = !!filters.status;
+  const selectedLabel = filters.label ? findLabel(labelGroups, filters.label) : null;
+  const hasLabel = !!filters.label;
   const hasDateRange = !!filters.dateFrom || !!filters.dateTo;
   const prioritiesFiltered = filters.priorities.size > 0 && filters.priorities.size < 5;
-  const anyActiveChip = hasSearch || hasAssignee || hasStatus || hasDateRange || prioritiesFiltered;
+  const anyActiveChip = hasSearch || hasAssignee || hasStatus || hasLabel || hasDateRange || prioritiesFiltered;
 
   const clearAll = () => {
     onFiltersChange({
@@ -142,6 +165,7 @@ export default function FilterBar({
       search: '',
       assignee: '',
       status: '',
+      label: '',
       dateFrom: '',
       dateTo: '',
       priorities: new Set([0, 1, 2, 3, 4]),
@@ -162,6 +186,17 @@ export default function FilterBar({
   const statusOptions: DropdownOption[] = useMemo(
     () => statuses.map((s) => ({ value: s, label: s, icon: <StatusIcon /> })),
     [statuses],
+  );
+
+  // Only real label groups can color bars (ungrouped labels have no single "slot" per issue)
+  const colorByOptions: DropdownOption[] = useMemo(
+    () => [
+      { value: '', label: 'Color by priority', icon: <PaletteIcon /> },
+      ...labelGroups
+        .filter((g) => g.id)
+        .map((g) => ({ value: g.name, label: `Color by ${g.name}`, icon: <PaletteIcon /> })),
+    ],
+    [labelGroups],
   );
 
   const groupOptions: DropdownOption[] = useMemo(
@@ -222,6 +257,15 @@ export default function FilterBar({
           onChange={(v) => onFiltersChange({ ...filters, status: v })}
         />
 
+        {/* Label (pick a group, then a label) */}
+        {labelGroups.length > 0 && (
+          <LabelFilter
+            value={filters.label}
+            groups={labelGroups}
+            onChange={(v) => onFiltersChange({ ...filters, label: v })}
+          />
+        )}
+
         <div className="w-px h-5 bg-border-primary shrink-0" />
 
         {/* Priority chips */}
@@ -255,6 +299,18 @@ export default function FilterBar({
           onChange={(v) => onGroupByChange((v || 'none') as GroupBy)}
           required
         />
+
+        {/* Bar colors: priority or a label group (e.g. Area) */}
+        {onColorByGroupChange && colorByOptions.length > 1 && (
+          <CustomDropdown
+            value={colorByGroup}
+            options={colorByOptions}
+            placeholder="Color by priority"
+            placeholderIcon={<PaletteIcon />}
+            onChange={onColorByGroupChange}
+            required
+          />
+        )}
 
         {/* Date range */}
         <DateRangePicker
@@ -307,6 +363,16 @@ export default function FilterBar({
           )}
           {hasStatus && (
             <ActiveChip label={filters.status} onClear={() => onFiltersChange({ ...filters, status: '' })} />
+          )}
+          {hasLabel && (
+            <ActiveChip
+              label={
+                selectedLabel
+                  ? `${selectedLabel.group.id ? `${selectedLabel.group.name}: ` : ''}${selectedLabel.label.name}`
+                  : 'Label'
+              }
+              onClear={() => onFiltersChange({ ...filters, label: '' })}
+            />
           )}
           {prioritiesFiltered && (
             <ActiveChip

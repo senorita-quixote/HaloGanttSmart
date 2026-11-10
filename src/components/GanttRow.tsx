@@ -7,12 +7,14 @@ import { isSafeUrl } from '@/utils/url';
 import {
   barGradients,
   barShadows,
+  customBarStyle,
   idColors,
   priorityBadgeClasses,
   priorityClass,
   statusDotColors,
 } from '@/utils/colors';
 import { buildTimeCells, daysBetween, formatDate, isWeekend } from '@/utils/date';
+import { labelColorInGroup } from '@/utils/labels';
 import { openDetailPanel } from './DetailPanel';
 
 interface Props {
@@ -31,6 +33,8 @@ interface Props {
   depViolation?: string[]; // list of blocker IDs whose schedule is violated
   baseline?: TaskBaseline;
   isDone?: boolean;
+  /** Label group name whose label colors the bar (e.g. "Area"); falls back to priority colors */
+  colorByGroup?: string;
   onReorder?: (draggedUuid: string, targetUuid: string, placeAfter: boolean) => void;
 }
 
@@ -52,9 +56,12 @@ export default function GanttRow({
   depViolation,
   baseline,
   isDone,
+  colorByGroup,
   onReorder,
 }: Props) {
   const pCls = priorityClass(task.priorityVal);
+  const groupColor = colorByGroup ? labelColorInGroup(task, colorByGroup) : undefined;
+  const labelBar = groupColor ? customBarStyle(groupColor) : null;
   const dueDate = new Date(task.due + 'T00:00:00');
   const daysLeft = daysBetween(today, dueDate);
   const overdue = daysLeft < 0;
@@ -630,12 +637,12 @@ export default function GanttRow({
                 ? 'linear-gradient(135deg, #15803d, #22c55e)'
                 : overdue
                   ? 'linear-gradient(135deg, #b91c1c, #ef4444)'
-                  : barGradients[pCls],
+                  : labelBar?.background ?? barGradients[pCls],
               boxShadow: isDone
                 ? '0 2px 8px rgba(34,197,94,0.3)'
                 : overdue
                   ? '0 2px 12px rgba(239,68,68,0.4)'
-                  : barShadows[pCls],
+                  : labelBar?.boxShadow ?? barShadows[pCls],
               overflow: 'hidden',
               outline: task.isDueImplicit ? '1.5px dashed rgba(255,255,255,0.45)' : undefined,
               outlineOffset: task.isDueImplicit ? '-3px' : undefined,

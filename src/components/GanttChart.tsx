@@ -25,6 +25,8 @@ interface Props {
   /** Omit to render milestones read-only (no dragging) — e.g. shared views */
   onUpdateMilestoneDate?: (milestoneId: string, newTargetDate: string) => Promise<void>;
   baselines?: Map<string, TaskBaseline>;
+  /** Label group name whose label colors the bars (e.g. "Area"); omit for priority colors */
+  colorByGroup?: string;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -106,6 +108,7 @@ export default function GanttChart({
                                      onReorder,
                                      onUpdateMilestoneDate,
                                      baselines,
+                                     colorByGroup,
                                      dateFrom,
                                      dateTo,
                                    }: Props) {
@@ -752,6 +755,7 @@ export default function GanttChart({
               isConnecting={isConnecting}
               depViolations={depViolations}
               baselines={baselines}
+              colorByGroup={colorByGroup}
               onReorder={onReorder}
             />
           ))}
@@ -1017,6 +1021,7 @@ function GroupRows({
                      isConnecting,
                      depViolations,
                      baselines,
+                     colorByGroup,
                      onReorder,
                    }: {
   group: { key: string; label: string; tasks: Task[] };
@@ -1037,6 +1042,7 @@ function GroupRows({
   isConnecting?: boolean;
   depViolations?: Map<string, string[]>;
   baselines?: Map<string, TaskBaseline>;
+  colorByGroup?: string;
   onReorder?: (draggedUuid: string, targetUuid: string, placeAfter: boolean) => void;
 }) {
   return (
@@ -1087,6 +1093,7 @@ function GroupRows({
             isConnecting={isConnecting}
             depViolation={depViolations?.get(task.id)}
             baseline={baselines?.get(task.id)}
+            colorByGroup={colorByGroup}
             onReorder={onReorder}
           />
         ))}

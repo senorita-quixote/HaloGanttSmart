@@ -41,6 +41,9 @@ function GanttView({
     milestones,
     assignees,
     statuses,
+    labelGroups,
+    colorByGroup,
+    setColorByGroup,
     loading,
     error,
     lastSynced,
@@ -178,6 +181,9 @@ function GanttView({
         onSelectProject={selectProject}
         assignees={assignees}
         statuses={statuses}
+        labelGroups={labelGroups}
+        colorByGroup={colorByGroup}
+        onColorByGroupChange={setColorByGroup}
         filters={filters}
         onFiltersChange={setFilters}
         totalCount={tasks.length}
@@ -208,6 +214,7 @@ function GanttView({
           onReorder={reorderTask}
           onUpdateMilestoneDate={updateMilestoneDate}
           baselines={showBaselines ? baselines : undefined}
+          colorByGroup={colorByGroup}
           dateFrom={filters.dateFrom}
           dateTo={filters.dateTo}
         />

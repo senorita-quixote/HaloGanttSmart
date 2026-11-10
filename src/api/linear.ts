@@ -198,6 +198,7 @@ export async function fetchIssues(
             assignee { name }
             team { id }
             projectMilestone { id }
+            labels(first: 20) { nodes { id name color parent { id name } } }
           }
         }
         doneIssues: issues(first: 100, filter: { completedAt: { null: false } }) {
@@ -215,6 +216,7 @@ export async function fetchIssues(
             assignee { name }
             team { id }
             projectMilestone { id }
+            labels(first: 20) { nodes { id name color parent { id name } } }
           }
         }
       }
@@ -236,6 +238,9 @@ export async function fetchIssues(
     assignee: { name: string } | null;
     team: { id: string } | null;
     projectMilestone: { id: string } | null;
+    labels?: {
+      nodes: Array<{ id: string; name: string; color: string; parent: { id: string; name: string } | null }>;
+    };
   }
 
   interface MilestoneNode {
@@ -372,6 +377,13 @@ export async function fetchIssues(
       completedAt: n.completedAt || undefined,
       isDueImplicit: isDueImplicit || undefined,
       milestoneId: n.projectMilestone?.id ?? null,
+      labels: (n.labels?.nodes || []).map((l) => ({
+        id: l.id,
+        name: l.name,
+        color: l.color,
+        groupId: l.parent?.id ?? null,
+        groupName: l.parent?.name ?? null,
+      })),
     };
   }
 

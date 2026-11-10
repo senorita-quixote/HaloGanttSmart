@@ -84,7 +84,7 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
     <div ref={ref} className="relative hidden lg:flex items-center gap-1.5">
       <button
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 py-[7px] px-3 bg-bg-card border rounded-md text-xs font-medium cursor-pointer outline-none transition-colors hover:border-text-muted ${
+        className={`inline-flex items-center gap-1.5 whitespace-nowrap py-[7px] px-3 bg-bg-card border rounded-md text-xs font-medium cursor-pointer outline-none transition-colors hover:border-text-muted ${
           hasRange ? 'border-accent text-accent' : 'border-border-secondary text-text-secondary'
         }`}
       >

@@ -22,6 +22,7 @@ export function useSharedData(shareToken: string) {
   const [filters, setFilters] = useState<Filters>({
     assignee: '',
     status: '',
+    label: '',
     priorities: new Set(DEFAULT_PRIORITIES),
     search: '',
     dateFrom: '',
@@ -36,6 +37,7 @@ export function useSharedData(shareToken: string) {
       if (!filters.priorities.has(t.priorityVal)) return false;
       if (filters.assignee && t.assignee !== filters.assignee) return false;
       if (filters.status && t.status !== filters.status) return false;
+      if (filters.label && !t.labels?.some((l) => l.id === filters.label)) return false;
       if (filters.search) {
         const hay = `${t.id} ${t.title} ${t.assignee} ${t.status}`.toLowerCase();
         if (!hay.includes(filters.search.toLowerCase())) return false;

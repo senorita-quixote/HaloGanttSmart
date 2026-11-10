@@ -12,6 +12,7 @@ import {
   updateMilestoneTargetDate,
 } from '@/api/linear';
 import { toast, toastError, toastSuccess } from '@/components/Toast';
+import { buildLabelGroups } from '@/utils/labels';
 import { DEFAULT_DAY_WIDTH, MAX_DAY_WIDTH, MIN_DAY_WIDTH, TIME_SCALE_FACTORS } from '@/types';
 import type { Filters, GroupBy, Milestone, Project, Task, TimeScale, WorkflowState } from '@/types';
 
@@ -54,6 +55,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
   const [filters, setFilters] = useState<Filters>({
     assignee: '',
     status: '',
+    label: '',
     priorities: new Set(DEFAULT_PRIORITIES),
     search: '',
     dateFrom: '',
@@ -69,6 +71,14 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
 
   const assignees = useMemo(() => [...new Set(tasks.map((t) => t.assignee))].sort(), [tasks]);
   const statuses = useMemo(() => [...new Set(tasks.map((t) => t.status))].sort(), [tasks]);
+  const labelGroups = useMemo(() => buildLabelGroups(tasks), [tasks]);
+
+  // Label group name whose label colors the bars (e.g. "Area"). '' = color by priority.
+  const [colorByGroup, setColorByGroupState] = useState(() => localStorage.getItem('gantt_color_by_group') || '');
+  const setColorByGroup = useCallback((group: string) => {
+    setColorByGroupState(group);
+    localStorage.setItem('gantt_color_by_group', group);
+  }, []);
 
   // Custom display order (uuids), persisted per project. Empty = default sort from the API.
   const [customOrder, setCustomOrder] = useState<string[]>(() =>
@@ -99,6 +109,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
       if (!filters.priorities.has(t.priorityVal)) return false;
       if (filters.assignee && t.assignee !== filters.assignee) return false;
       if (filters.status && t.status !== filters.status) return false;
+      if (filters.label && !t.labels?.some((l) => l.id === filters.label)) return false;
       if (filters.search) {
         const hay = `${t.id} ${t.title} ${t.assignee} ${t.status}`.toLowerCase();
         if (!hay.includes(filters.search.toLowerCase())) return false;
@@ -232,7 +243,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
     (id: string) => {
       setSelectedProjectId(id);
       localStorage.setItem('linear_selected_project', id);
-      setFilters({ assignee: '', status: '', priorities: new Set(DEFAULT_PRIORITIES), search: '', dateFrom: '', dateTo: '' });
+      setFilters({ assignee: '', status: '', label: '', priorities: new Set(DEFAULT_PRIORITIES), search: '', dateFrom: '', dateTo: '' });
       undoStackRef.current = []; // Clear undo on project switch
       loadIssues(id);
     },
@@ -579,6 +590,9 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
     workflowStates,
     assignees,
     statuses,
+    labelGroups,
+    colorByGroup,
+    setColorByGroup,
     loading,
     error,
     lastSynced,

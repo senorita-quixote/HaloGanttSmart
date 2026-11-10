@@ -22,6 +22,24 @@ export interface Task {
   isDueImplicit?: boolean;
   /** Linear project milestone this issue belongs to, if any */
   milestoneId?: string | null;
+  /** Issue labels. Undefined when the data source doesn't include them (e.g. shared views). */
+  labels?: TaskLabel[];
+}
+
+export interface TaskLabel {
+  id: string;
+  name: string;
+  color: string;
+  /** Label group (Linear parent label), or null for ungrouped labels */
+  groupId: string | null;
+  groupName: string | null;
+}
+
+/** A label group with the labels used by the current tasks. Ungrouped labels use groupId ''. */
+export interface LabelGroup {
+  id: string;
+  name: string;
+  labels: Array<{ id: string; name: string; color: string }>;
 }
 
 export interface Project {
@@ -74,6 +92,8 @@ export const TIME_SCALE_FACTORS: Record<TimeScale, number> = {
 export interface Filters {
   assignee: string;
   status: string;
+  /** Label id, or '' for any label */
+  label: string;
   priorities: Set<number>;
   search: string;
   dateFrom: string;
