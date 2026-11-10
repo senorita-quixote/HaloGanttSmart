@@ -8,18 +8,32 @@ React 19 + TypeScript + Vite 8 + Tailwind 4. Supabase for auth/DB, Netlify for h
 - `origin` = https://github.com/senorita-quixote/HaloGanttSmart (our fork, public)
 - `upstream` = https://github.com/sideq-io/ganttsmart (original project, AGPL-3.0)
 - `main`: mirrors `upstream/main`. Never commit to it.
-- `feat/<name>`: one branch per change, always branched from `main` (not `halo`), so each can become an upstream PR on its own.
-- `halo`: `main` + all our `feat/*` branches merged in. This is what we run day to day (and will deploy later).
-- Halo-only files (like this `CLAUDE.md`) live on `halo` only. Never put them on a `feat/*` branch.
+- `feat/local-mode`: the local-mode change only (candidate upstream PR). Don't add other work to it.
+- `feat/<name>`: one branch per feature, branched from `halo` so it runs in local mode.
+- `halo`: `main` + local mode + all our features. This is what we run day to day (and will deploy later).
+- Halo-only files (like this `CLAUDE.md`) live on `halo`. Never include them in an upstream PR.
 
-### Workflow for a new change
+### Workflow for a new feature
 
 ```bash
-git checkout main && git pull --ff-only upstream main
+git checkout halo && git pull
 git checkout -b feat/<name>
-# ...make the change, commit...
+# ...make the change, commit (keep feature commits separate from any CLAUDE.md edits)...
 git push -u origin feat/<name>
 git checkout halo && git merge feat/<name> && git push
+```
+
+### Sending a feature upstream (optional)
+
+Feature branches are based on `halo`, so they contain local mode and `CLAUDE.md`. For an upstream PR, make a clean branch from `main` with only that feature's commits:
+
+```bash
+git fetch upstream
+git checkout -b pr/<name> upstream/main
+git cherry-pick <feature commit(s)>
+npm run lint && npx tsc -b
+git push -u origin pr/<name>
+# open a PR from senorita-quixote:pr/<name> to sideq-io:main
 ```
 
 ### Pulling upstream fixes
