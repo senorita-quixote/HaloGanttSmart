@@ -8,3 +8,5 @@ dist
 .netlify
 .claude
 *.py
+# macOS
+.DS_Store
