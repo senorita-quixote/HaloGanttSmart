@@ -13,6 +13,18 @@ import {
 } from '@/api/linear';
 import { toast, toastError, toastSuccess } from '@/components/Toast';
 import { buildLabelGroups } from '@/utils/labels';
+import {
+  addChange,
+  applyDraft,
+  changeGroupKey,
+  changeKey,
+  draftOriginalDates,
+  loadDraft,
+  officialDue,
+  saveDraft,
+  type Draft,
+  type DraftChange,
+} from './draft';
 import { DEFAULT_DAY_WIDTH, MAX_DAY_WIDTH, MIN_DAY_WIDTH, TIME_SCALE_FACTORS } from '@/types';
 import type { Filters, GroupBy, Milestone, Project, Task, TimeScale, WorkflowState } from '@/types';
 
@@ -69,9 +81,58 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
   // Undo stack: stores previous task snapshots
   const undoStackRef = useRef<Array<{ tasks: Task[]; label: string }>>([]);
 
-  const assignees = useMemo(() => [...new Set(tasks.map((t) => t.assignee))].sort(), [tasks]);
-  const statuses = useMemo(() => [...new Set(tasks.map((t) => t.status))].sort(), [tasks]);
-  const labelGroups = useMemo(() => buildLabelGroups(tasks), [tasks]);
+  // Draft mode: changes stay on screen (and in localStorage) until applied to Linear.
+  // `tasks`/`unscheduledTasks`/`milestones` above always hold Linear's data; `view` adds the draft.
+  const [draft, setDraftState] = useState<Draft | null>(() =>
+    loadDraft(localStorage.getItem('linear_selected_project') || ''),
+  );
+  const draftHistoryRef = useRef<Array<Draft>>([]); // for Ctrl+Z while drafting
+  // Latest draft, so edits made back to back (e.g. moving a bar sets start and due) build on each other
+  const draftRef = useRef<Draft | null>(draft);
+  const lastDraftEditRef = useRef(0);
+
+  const setDraft = useCallback((next: Draft | null) => {
+    draftRef.current = next;
+    setDraftState(next);
+    if (next) saveDraft(next.projectId, next);
+  }, []);
+
+  useEffect(() => {
+    const d = loadDraft(selectedProjectId);
+    draftRef.current = d;
+    setDraftState(d);
+    draftHistoryRef.current = [];
+  }, [selectedProjectId]);
+
+  /** Record an edit in the draft (undoable with Ctrl+Z) */
+  const editDraft = useCallback(
+    (fn: (d: Draft) => Draft) => {
+      const current = draftRef.current;
+      if (!current) return;
+      // Edits that land together (moving a bar sets start and due) undo as one step
+      const now = Date.now();
+      if (now - lastDraftEditRef.current > 100) {
+        draftHistoryRef.current.push(current);
+        if (draftHistoryRef.current.length > 50) draftHistoryRef.current.shift();
+      }
+      lastDraftEditRef.current = now;
+      setDraft(fn(current));
+    },
+    [setDraft],
+  );
+
+  const view = useMemo(
+    () => applyDraft(draft, tasks, unscheduledTasks, milestones),
+    [draft, tasks, unscheduledTasks, milestones],
+  );
+  const draftOriginals = useMemo(
+    () => draftOriginalDates(draft, tasks, unscheduledTasks),
+    [draft, tasks, unscheduledTasks],
+  );
+
+  const assignees = useMemo(() => [...new Set(view.tasks.map((t) => t.assignee))].sort(), [view.tasks]);
+  const statuses = useMemo(() => [...new Set(view.tasks.map((t) => t.status))].sort(), [view.tasks]);
+  const labelGroups = useMemo(() => buildLabelGroups(view.tasks), [view.tasks]);
 
   // Label group name whose label colors the bars (e.g. "Area"). '' = color by priority.
   const [colorByGroup, setColorByGroupState] = useState(() => localStorage.getItem('gantt_color_by_group') || '');
@@ -91,10 +152,11 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
 
   // Tasks in display order: saved positions first, unknown (new) tasks keep their
   // default priority/due order after them. Sort is stable, so ties preserve fetch order.
+  const activeOrder = draft?.order ?? customOrder;
   const orderedTasks = useMemo(() => {
-    if (customOrder.length === 0) return tasks;
-    const pos = new Map(customOrder.map((uuid, i) => [uuid, i]));
-    return [...tasks].sort((a, b) => {
+    if (activeOrder.length === 0) return view.tasks;
+    const pos = new Map(activeOrder.map((uuid, i) => [uuid, i]));
+    return [...view.tasks].sort((a, b) => {
       const ai = pos.get(a.uuid);
       const bi = pos.get(b.uuid);
       if (ai === undefined && bi === undefined) return 0;
@@ -102,7 +164,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
       if (bi === undefined) return -1;
       return ai - bi;
     });
-  }, [tasks, customOrder]);
+  }, [view.tasks, activeOrder]);
 
   const filteredTasks = useMemo(() => {
     return orderedTasks.filter((t) => {
@@ -129,6 +191,11 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
       const targetIdx = order.indexOf(targetUuid);
       if (targetIdx === -1) return;
       order.splice(placeAfter ? targetIdx + 1 : targetIdx, 0, draggedUuid);
+      if (draft) {
+        // Drafted row order is kept only if the draft is applied
+        editDraft((d) => ({ ...d, order }));
+        return;
+      }
       setCustomOrder(order);
       if (selectedProjectId) {
         try {
@@ -138,7 +205,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
         }
       }
     },
-    [orderedTasks, selectedProjectId],
+    [orderedTasks, selectedProjectId, draft, editDraft],
   );
 
   // Push to undo stack and show toast with Undo action
@@ -149,11 +216,16 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
   }, []);
 
   const undo = useCallback(() => {
+    if (draft) {
+      const prev = draftHistoryRef.current.pop();
+      if (prev) setDraft(prev);
+      return;
+    }
     const entry = undoStackRef.current.pop();
     if (!entry) return;
     setTasks(entry.tasks);
     toastSuccess(`Undone: ${entry.label}`);
-  }, []);
+  }, [draft, setDraft]);
 
   const loadProjects = useCallback(async () => {
     if (!linearToken) return;
@@ -280,6 +352,11 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
   const reschedule = useCallback(
     async (taskUuid: string, newDueDate: string) => {
       if (!linearToken) return;
+      if (draft) {
+        const o = [...tasks, ...unscheduledTasks].find((t) => t.uuid === taskUuid);
+        if (o) editDraft((d) => addChange(d, { kind: 'due', uuid: o.uuid, taskId: o.id, title: o.title, from: officialDue(o), to: newDueDate }));
+        return;
+      }
 
       const prevTasks = tasks;
       const prevUnscheduled = unscheduledTasks;
@@ -319,13 +396,18 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
         pendingMutations.current--;
       }
     },
-    [linearToken, tasks, unscheduledTasks, pushUndo],
+    [linearToken, tasks, unscheduledTasks, pushUndo, draft, editDraft],
   );
 
   // Optimistic reschedule (start date) with rollback + undo
   const rescheduleStart = useCallback(
     async (taskUuid: string, newStartDate: string) => {
       if (!linearToken) return;
+      if (draft) {
+        const o = [...tasks, ...unscheduledTasks].find((t) => t.uuid === taskUuid);
+        if (o) editDraft((d) => addChange(d, { kind: 'start', uuid: o.uuid, taskId: o.id, title: o.title, from: o.startDate, to: newStartDate }));
+        return;
+      }
 
       const prevTasks = tasks;
       const task = tasks.find((t) => t.uuid === taskUuid);
@@ -352,7 +434,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
         pendingMutations.current--;
       }
     },
-    [linearToken, tasks, pushUndo],
+    [linearToken, tasks, unscheduledTasks, pushUndo, draft, editDraft],
   );
 
   // Optimistic milestone move (drag on the chart) with rollback + undo
@@ -363,6 +445,12 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
       const prevMilestones = milestones;
       const milestone = milestones.find((m) => m.id === milestoneId);
       if (!milestone) return;
+      if (draft) {
+        editDraft((d) =>
+          addChange(d, { kind: 'milestone', id: milestoneId, name: milestone.name, from: milestone.targetDate, to: newTargetDate }),
+        );
+        return;
+      }
 
       setMilestones((prev) =>
         prev.map((m) => (m.id === milestoneId ? { ...m, targetDate: newTargetDate } : m)),
@@ -390,14 +478,15 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
         pendingMutations.current--;
       }
     },
-    [linearToken, milestones],
+    [linearToken, milestones, draft, editDraft],
   );
 
   // Optimistic status cycle with rollback + undo
   const cycleStatus = useCallback(
     async (taskUuid: string) => {
       if (!linearToken || workflowStates.length === 0) return;
-      const task = tasks.find((t) => t.uuid === taskUuid);
+      // While drafting, cycle from the drafted status
+      const task = (draft ? view.tasks : tasks).find((t) => t.uuid === taskUuid);
       if (!task) return;
 
       const typeOrder = ['unstarted', 'started', 'completed'];
@@ -406,6 +495,25 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
 
       const nextState = workflowStates.find((s) => s.type === nextType);
       if (!nextState || nextState.name === task.status) return;
+
+      if (draft) {
+        const o = tasks.find((t) => t.uuid === taskUuid);
+        if (o) {
+          editDraft((d) =>
+            addChange(d, {
+              kind: 'status',
+              uuid: o.uuid,
+              taskId: o.id,
+              title: o.title,
+              from: o.status,
+              to: nextState.name,
+              toType: nextState.type,
+              toStateId: nextState.id,
+            }),
+          );
+        }
+        return;
+      }
 
       const prevTasks = tasks;
       const prevState = workflowStates.find((s) => s.name === task.status);
@@ -431,7 +539,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
         pendingMutations.current--;
       }
     },
-    [linearToken, workflowStates, tasks, pushUndo],
+    [linearToken, workflowStates, tasks, pushUndo, draft, view.tasks, editDraft],
   );
 
   // Create a "blocks" relation between two tasks
@@ -439,8 +547,9 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
     async (sourceTaskId: string, targetTaskId: string) => {
       if (!linearToken) return;
 
-      const sourceTask = tasks.find((t) => t.id === sourceTaskId);
-      const targetTask = tasks.find((t) => t.id === targetTaskId);
+      const current = draft ? view.tasks : tasks;
+      const sourceTask = current.find((t) => t.id === sourceTaskId);
+      const targetTask = current.find((t) => t.id === targetTaskId);
       if (!sourceTask || !targetTask) return;
 
       // Prevent duplicate
@@ -452,6 +561,13 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
       // Prevent circular
       if (targetTask.blocks.includes(sourceTaskId)) {
         toastError(`Cannot create circular dependency: ${targetTaskId} already blocks ${sourceTaskId}`);
+        return;
+      }
+
+      if (draft) {
+        editDraft((d) =>
+          addChange(d, { kind: 'relation', add: true, sourceId: sourceTaskId, targetId: targetTaskId, sourceUuid: sourceTask.uuid, targetUuid: targetTask.uuid }),
+        );
         return;
       }
 
@@ -477,7 +593,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
         pendingMutations.current--;
       }
     },
-    [linearToken, tasks, pushUndo],
+    [linearToken, tasks, pushUndo, draft, view.tasks, editDraft],
   );
 
   // Remove a "blocks" relation between two tasks
@@ -486,9 +602,17 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
     async (sourceTaskId: string, targetTaskId: string) => {
       if (!linearToken) return;
 
-      const sourceTask = tasks.find((t) => t.id === sourceTaskId);
-      const targetTask = tasks.find((t) => t.id === targetTaskId);
+      const current = draft ? view.tasks : tasks;
+      const sourceTask = current.find((t) => t.id === sourceTaskId);
+      const targetTask = current.find((t) => t.id === targetTaskId);
       if (!sourceTask || !targetTask) return;
+
+      if (draft) {
+        editDraft((d) =>
+          addChange(d, { kind: 'relation', add: false, sourceId: sourceTaskId, targetId: targetTaskId, sourceUuid: sourceTask.uuid, targetUuid: targetTask.uuid }),
+        );
+        return;
+      }
 
       const prevTasks = tasks;
       // Optimistic update
@@ -512,7 +636,108 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
         pendingMutations.current--;
       }
     },
-    [linearToken, tasks, pushUndo],
+    [linearToken, tasks, pushUndo, draft, view.tasks, editDraft],
+  );
+
+  // ---- Draft mode controls ----
+
+  const startDraft = useCallback(() => {
+    if (!selectedProjectId || draft) return;
+    draftHistoryRef.current = [];
+    setDraft({ projectId: selectedProjectId, changes: {}, order: null });
+  }, [selectedProjectId, draft, setDraft]);
+
+  /** Leave draft mode and throw away all draft changes (nothing was sent to Linear) */
+  const discardDraft = useCallback(() => {
+    if (!draft) return;
+    saveDraft(draft.projectId, null);
+    draftRef.current = null;
+    setDraftState(null);
+    draftHistoryRef.current = [];
+  }, [draft]);
+
+  /** Drop some changes from the draft without applying them */
+  const revertDraftChanges = useCallback(
+    (keys: string[]) => {
+      editDraft((d) => {
+        const changes = { ...d.changes };
+        for (const k of keys) delete changes[k];
+        return { ...d, changes };
+      });
+    },
+    [editDraft],
+  );
+
+  /**
+   * Send the chosen draft changes to Linear. Applied changes leave the draft; failed ones stay.
+   * When nothing is left, draft mode ends and the drafted row order becomes the saved order.
+   * Returns the changes that were applied.
+   */
+  const applyDraftChanges = useCallback(
+    async (keys: string[]): Promise<DraftChange[]> => {
+      if (!linearToken || !draft) return [];
+      const applied: DraftChange[] = [];
+      const failed: string[] = [];
+      pendingMutations.current++;
+      try {
+        for (const key of keys) {
+          const c = draft.changes[key];
+          if (!c) continue;
+          try {
+            if (c.kind === 'due') await updateIssueDueDate(linearToken, c.uuid, c.to);
+            else if (c.kind === 'start') await updateIssueStartDate(linearToken, c.uuid, c.to);
+            else if (c.kind === 'status') await updateIssueState(linearToken, c.uuid, c.toStateId);
+            else if (c.kind === 'milestone') await updateMilestoneTargetDate(linearToken, c.id, c.to);
+            else if (c.add) await createIssueRelation(linearToken, c.sourceUuid, c.targetUuid);
+            else await removeIssueRelation(linearToken, c.sourceUuid, c.targetUuid);
+            applied.push(c);
+          } catch (e) {
+            failed.push(`${changeKey(c)}: ${(e as Error).message}`);
+          }
+        }
+      } finally {
+        pendingMutations.current--;
+      }
+
+      // Show applied changes as official right away; the refresh below confirms them
+      const appliedDraft: Draft = {
+        projectId: draft.projectId,
+        changes: Object.fromEntries(applied.map((c) => [changeKey(c), c])),
+        order: null,
+      };
+      const next = applyDraft(appliedDraft, tasks, unscheduledTasks, milestones);
+      setTasks(next.tasks);
+      setUnscheduledTasks(next.unscheduledTasks);
+      setMilestones(next.milestones);
+
+      // Edits made while applying are kept
+      const latest = draftRef.current ?? draft;
+      const remaining = { ...latest.changes };
+      for (const c of applied) delete remaining[changeKey(c)];
+      draftHistoryRef.current = [];
+      if (Object.keys(remaining).length === 0) {
+        if (latest.order) {
+          setCustomOrder(latest.order);
+          try {
+            localStorage.setItem(customOrderKey(latest.projectId), JSON.stringify(latest.order));
+          } catch {
+            // localStorage unavailable — order still applies for this session
+          }
+        }
+        saveDraft(draft.projectId, null);
+        draftRef.current = null;
+        setDraftState(null);
+      } else {
+        setDraft({ ...latest, changes: remaining });
+      }
+
+      if (failed.length) toastError(`${failed.length} change(s) failed and are still in your draft. ${failed[0]}`);
+      const appliedCount = new Set(applied.map(changeGroupKey)).size;
+      if (appliedCount) toastSuccess(`Applied ${appliedCount} change${appliedCount === 1 ? '' : 's'} to Linear`);
+      silentRefresh(draft.projectId);
+      return applied;
+    },
+    [linearToken, draft, tasks, unscheduledTasks, milestones, setDraft, silentRefresh],
   );
 
   // Initial load when token is available
@@ -582,11 +807,22 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
     projects,
     selectedProjectId,
     projectName,
-    tasks,
+    /** Tasks as shown (Linear data + draft changes) */
+    tasks: view.tasks,
+    /** Tasks exactly as they are in Linear */
+    officialTasks: tasks,
+    officialUnscheduledTasks: unscheduledTasks,
+    officialMilestones: milestones,
     doneTasks,
-    unscheduledTasks,
+    unscheduledTasks: view.unscheduledTasks,
     filteredTasks,
-    milestones,
+    milestones: view.milestones,
+    draft,
+    draftOriginals,
+    startDraft,
+    discardDraft,
+    revertDraftChanges,
+    applyDraftChanges,
     workflowStates,
     assignees,
     statuses,

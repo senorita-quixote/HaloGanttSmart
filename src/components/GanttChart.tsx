@@ -27,6 +27,8 @@ interface Props {
   baselines?: Map<string, TaskBaseline>;
   /** Label group name whose label colors the bars (e.g. "Area"); omit for priority colors */
   colorByGroup?: string;
+  /** Official dates for tasks changed in a draft, keyed by task id */
+  draftOriginals?: Map<string, { startDate: string | null; due: string | null }>;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -109,6 +111,7 @@ export default function GanttChart({
                                      onUpdateMilestoneDate,
                                      baselines,
                                      colorByGroup,
+                                     draftOriginals,
                                      dateFrom,
                                      dateTo,
                                    }: Props) {
@@ -756,6 +759,7 @@ export default function GanttChart({
               depViolations={depViolations}
               baselines={baselines}
               colorByGroup={colorByGroup}
+              draftOriginals={draftOriginals}
               onReorder={onReorder}
             />
           ))}
@@ -1022,6 +1026,7 @@ function GroupRows({
                      depViolations,
                      baselines,
                      colorByGroup,
+                     draftOriginals,
                      onReorder,
                    }: {
   group: { key: string; label: string; tasks: Task[] };
@@ -1043,6 +1048,7 @@ function GroupRows({
   depViolations?: Map<string, string[]>;
   baselines?: Map<string, TaskBaseline>;
   colorByGroup?: string;
+  draftOriginals?: Map<string, { startDate: string | null; due: string | null }>;
   onReorder?: (draggedUuid: string, targetUuid: string, placeAfter: boolean) => void;
 }) {
   return (
@@ -1094,6 +1100,7 @@ function GroupRows({
             depViolation={depViolations?.get(task.id)}
             baseline={baselines?.get(task.id)}
             colorByGroup={colorByGroup}
+            draftOriginal={draftOriginals?.get(task.id)}
             onReorder={onReorder}
           />
         ))}

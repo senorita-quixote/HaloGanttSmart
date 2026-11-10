@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import AuthPage from '@/components/AuthPage';
 import KeycloakAuthPage from '@/components/KeycloakAuthPage';
+import DraftBar from '@/components/DraftBar';
 import FilterBar from '@/components/FilterBar';
 import GanttChart from '@/components/GanttChart';
 import Header from '@/components/Header';
@@ -13,6 +14,7 @@ import DetailPanel, { setRemoveRelationHandler, setBaselinesForPanel } from '@/c
 import MilestonePanel, { setMilestoneDateHandler } from '@/components/MilestonePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useLinearData } from '@/hooks/useLinearData';
+import type { DraftChange } from '@/hooks/draft';
 import { usePlanningHistory } from '@/hooks/usePlanningHistory';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -35,10 +37,19 @@ function GanttView({
     selectedProjectId,
     projectName,
     tasks,
+    officialTasks,
+    officialUnscheduledTasks,
+    officialMilestones,
     doneTasks,
     unscheduledTasks,
     filteredTasks,
     milestones,
+    draft,
+    draftOriginals,
+    startDraft,
+    discardDraft,
+    revertDraftChanges,
+    applyDraftChanges,
     assignees,
     statuses,
     labelGroups,
@@ -77,39 +88,54 @@ function GanttView({
     localStorage.setItem('gantt_show_baselines', show ? '1' : '0');
   }, []);
 
-  // Sync baselines whenever tasks load
+  // Sync baselines whenever tasks load (Linear's data, never draft changes)
   useEffect(() => {
-    if (tasks.length > 0) syncBaselines(tasks);
-  }, [tasks, syncBaselines]);
+    if (officialTasks.length > 0) syncBaselines(officialTasks);
+  }, [officialTasks, syncBaselines]);
 
+  // Planning history only records changes that reach Linear: draft edits are logged when applied.
   // Wrap reschedule to log due date changes
   const rescheduleWithHistory = useCallback(
     async (taskUuid: string, newDueDate: string) => {
       const task = tasks.find((t) => t.uuid === taskUuid);
-      if (task) logChange(task.id, 'due_date', task.due, newDueDate);
+      if (task && !draft) logChange(task.id, 'due_date', task.due, newDueDate);
       return reschedule(taskUuid, newDueDate);
     },
-    [reschedule, tasks, logChange],
+    [reschedule, tasks, logChange, draft],
   );
 
   // Wrap rescheduleStart to log start date changes
   const rescheduleStartWithHistory = useCallback(
     async (taskUuid: string, newStartDate: string) => {
       const task = tasks.find((t) => t.uuid === taskUuid);
-      if (task) logChange(task.id, 'start_date', task.startDate, newStartDate);
+      if (task && !draft) logChange(task.id, 'start_date', task.startDate, newStartDate);
       return rescheduleStart(taskUuid, newStartDate);
     },
-    [rescheduleStart, tasks, logChange],
+    [rescheduleStart, tasks, logChange, draft],
   );
 
   // Wrap cycleStatus to log status transitions
   const cycleStatusWithHistory = useCallback(
     async (taskUuid: string) => {
       const task = tasks.find((t) => t.uuid === taskUuid);
-      if (task) logStatusTransition(task.id, task.status, '(next)');
+      if (task && !draft) logStatusTransition(task.id, task.status, '(next)');
       return cycleStatus(taskUuid);
     },
-    [cycleStatus, tasks, logStatusTransition],
+    [cycleStatus, tasks, logStatusTransition, draft],
+  );
+
+  // Apply draft changes to Linear, then log the ones that went through
+  const applyDraftWithHistory = useCallback(
+    async (keys: string[]) => {
+      const applied: DraftChange[] = await applyDraftChanges(keys);
+      for (const c of applied) {
+        if (c.kind === 'due') logChange(c.taskId, 'due_date', c.from, c.to);
+        else if (c.kind === 'start') logChange(c.taskId, 'start_date', c.from, c.to);
+        else if (c.kind === 'status') logStatusTransition(c.taskId, c.from, c.to);
+      }
+      return applied;
+    },
+    [applyDraftChanges, logChange, logStatusTransition],
   );
 
   // Register the remove handler for DetailPanel's × buttons
@@ -173,7 +199,21 @@ function GanttView({
         onThemeChange={setTheme}
         projectId={selectedProjectId}
         tasks={filteredTasks}
+        draftActive={!!draft}
+        onStartDraft={selectedProjectId ? startDraft : undefined}
       />
+
+      {draft && (
+        <DraftBar
+          draft={draft}
+          officialTasks={officialTasks}
+          officialUnscheduledTasks={officialUnscheduledTasks}
+          officialMilestones={officialMilestones}
+          onApply={applyDraftWithHistory}
+          onRevert={revertDraftChanges}
+          onDiscard={discardDraft}
+        />
+      )}
 
       <FilterBar
         projects={projects}
@@ -215,6 +255,7 @@ function GanttView({
           onUpdateMilestoneDate={updateMilestoneDate}
           baselines={showBaselines ? baselines : undefined}
           colorByGroup={colorByGroup}
+          draftOriginals={draft ? draftOriginals : undefined}
           dateFrom={filters.dateFrom}
           dateTo={filters.dateTo}
         />

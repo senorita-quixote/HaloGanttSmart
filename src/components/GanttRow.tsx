@@ -32,6 +32,8 @@ interface Props {
   isConnecting?: boolean;
   depViolation?: string[]; // list of blocker IDs whose schedule is violated
   baseline?: TaskBaseline;
+  /** Official (Linear) dates when this task's dates are changed in a draft */
+  draftOriginal?: { startDate: string | null; due: string | null };
   isDone?: boolean;
   /** Label group name whose label colors the bar (e.g. "Area"); falls back to priority colors */
   colorByGroup?: string;
@@ -55,6 +57,7 @@ export default function GanttRow({
   isConnecting,
   depViolation,
   baseline,
+  draftOriginal,
   isDone,
   colorByGroup,
   onReorder,
@@ -366,6 +369,22 @@ export default function GanttRow({
     return { left: ghostLeft, width: ghostWidth };
   })();
 
+  // Ghost bar for draft mode — where the bar sits in Linear
+  const draftGhost = (() => {
+    if (!draftOriginal) return null;
+    const officialDue = draftOriginal.due ? new Date(draftOriginal.due + 'T00:00:00') : null;
+    if (!officialDue) return null; // was unscheduled in Linear
+    // Without a start date, bars start today (like the main bar)
+    const officialStart = draftOriginal.startDate
+      ? new Date(draftOriginal.startDate + 'T00:00:00')
+      : today < officialDue
+        ? today
+        : officialDue;
+    const startDay = Math.max(daysBetween(chartStart, officialStart), 0);
+    const endDay = daysBetween(chartStart, officialDue);
+    return { left: startDay * dayWidth, width: Math.max((endDay - startDay + 1) * dayWidth, dayWidth) };
+  })();
+
   // Reorder drop indicator: box-shadow won't render on <tr>, so paint it on the cells
   const dropIndicatorCls =
     dropPosition === 'above'
@@ -621,6 +640,15 @@ export default function GanttRow({
                 background: 'rgba(251, 191, 36, 0.08)',
               }}
               title={`Originally planned: ${baseline?.planned_start || '(no start)'} → ${baseline?.planned_due}`}
+            />
+          )}
+
+          {/* Ghost bar — official dates while this task is changed in a draft */}
+          {draftGhost && (
+            <div
+              className="absolute h-[28px] rounded-md top-1/2 -translate-y-1/2 z-[1] border-2 border-dashed border-accent/60 bg-accent/[0.06] pointer-events-none"
+              style={{ left: draftGhost.left, width: draftGhost.width }}
+              title={`In Linear: ${draftOriginal?.startDate || '(no start)'} → ${draftOriginal?.due}`}
             />
           )}
 

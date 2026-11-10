@@ -23,6 +23,9 @@ interface Props {
   onThemeChange: (theme: Theme) => void;
   projectId: string;
   tasks: Task[];
+  /** Draft mode: try changes without sending them to Linear */
+  draftActive?: boolean;
+  onStartDraft?: () => void;
 }
 
 const iconBtn =
@@ -73,6 +76,8 @@ export default memo(function Header({
   loading,
   lastSynced,
   onRefresh,
+  draftActive,
+  onStartDraft,
   onDisconnectLinear,
   onSignOut,
   onZoomIn,
@@ -173,6 +178,26 @@ export default memo(function Header({
           <span className="hidden lg:inline text-[11px] text-text-muted mr-1">
             Synced <span className="font-mono tabular-nums">{lastSynced}</span>
           </span>
+        )}
+
+        {/* Draft mode */}
+        {onStartDraft && (
+          <button
+            onClick={draftActive ? undefined : onStartDraft}
+            disabled={draftActive}
+            className={
+              draftActive
+                ? 'flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-semibold bg-amber-400/15 text-amber-600 border border-amber-400/40'
+                : ghostBtn
+            }
+            title={draftActive ? 'Draft mode is on' : 'Try changes without sending them to Linear'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+            <span className="hidden md:inline">{draftActive ? 'Drafting' : 'Draft'}</span>
+          </button>
         )}
 
         {/* Refresh */}
