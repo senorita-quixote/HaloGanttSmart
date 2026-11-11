@@ -193,6 +193,21 @@ export function groupTitle(c: DraftChange): string {
   return `${c.taskId} ${c.title}`;
 }
 
+/** Number of changes as the user sees them: one per task, milestone or dependency */
+export function draftChangeCount(draft: Draft): number {
+  return new Set(Object.values(draft.changes).map(changeGroupKey)).size;
+}
+
+/**
+ * Ask before throwing away a draft that has changes. Returns true when it's OK to discard.
+ */
+export function confirmDiscardDraft(draft: Draft): boolean {
+  const n = draftChangeCount(draft);
+  if (n === 0 && !draft.order) return true;
+  const what = n > 0 ? `${n} draft change${n === 1 ? '' : 's'}` : 'your drafted row order';
+  return window.confirm(`Discard ${what} and go back to Instant Sync Mode? Nothing was sent to Linear.`);
+}
+
 const storageKey = (projectId: string) => `gantt_draft_${projectId}`;
 
 export function loadDraft(projectId: string): Draft | null {

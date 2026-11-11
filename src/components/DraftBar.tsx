@@ -3,6 +3,7 @@ import type { Milestone, Task } from '@/types';
 import {
   changeGroupKey,
   changeKey,
+  confirmDiscardDraft,
   conflictFor,
   describeChange,
   groupTitle,
@@ -127,8 +128,7 @@ export default function DraftBar({
   };
 
   const discard = () => {
-    if (changeCount > 0 && !window.confirm(`Discard ${changeCount} draft change${changeCount === 1 ? '' : 's'}? Nothing was sent to Linear.`)) return;
-    onDiscard();
+    if (confirmDiscardDraft(draft)) onDiscard();
   };
 
   return (
@@ -136,7 +136,7 @@ export default function DraftBar({
       <div className="h-10 flex items-center gap-3 px-4 text-xs">
         <span className="inline-flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
           <PencilIcon />
-          Draft mode
+          Draft Mode
         </span>
         <span className="text-text-secondary truncate">
           Changes stay on this screen and aren't sent to Linear until you apply them. Dashed outlines show the

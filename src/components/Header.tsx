@@ -23,9 +23,9 @@ interface Props {
   onThemeChange: (theme: Theme) => void;
   projectId: string;
   tasks: Task[];
-  /** Draft mode: try changes without sending them to Linear */
+  /** Draft mode: try changes without sending them to Linear. Off = Instant Sync Mode. */
   draftActive?: boolean;
-  onStartDraft?: () => void;
+  onToggleDraft?: () => void;
 }
 
 const iconBtn =
@@ -77,7 +77,7 @@ export default memo(function Header({
   lastSynced,
   onRefresh,
   draftActive,
-  onStartDraft,
+  onToggleDraft,
   onDisconnectLinear,
   onSignOut,
   onZoomIn,
@@ -181,22 +181,32 @@ export default memo(function Header({
         )}
 
         {/* Draft mode */}
-        {onStartDraft && (
+        {onToggleDraft && (
           <button
-            onClick={draftActive ? undefined : onStartDraft}
-            disabled={draftActive}
+            onClick={onToggleDraft}
+            aria-pressed={draftActive}
             className={
               draftActive
-                ? 'flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-semibold bg-amber-400/15 text-amber-600 border border-amber-400/40'
+                ? 'flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-semibold bg-amber-400/15 text-amber-600 border border-amber-400/40 hover:bg-amber-400/25 transition-colors cursor-pointer'
                 : ghostBtn
             }
-            title={draftActive ? 'Draft mode is on' : 'Try changes without sending them to Linear'}
+            title={
+              draftActive
+                ? 'Draft Mode: changes stay here until you apply them. Click to go back to Instant Sync Mode.'
+                : 'Instant Sync Mode: changes go to Linear right away. Click to switch to Draft Mode.'
+            }
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
-            </svg>
-            <span className="hidden md:inline">{draftActive ? 'Drafting' : 'Draft'}</span>
+            {draftActive ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            )}
+            <span className="hidden md:inline">{draftActive ? 'Draft Mode' : 'Instant Sync Mode'}</span>
           </button>
         )}
 

@@ -14,7 +14,7 @@ import DetailPanel, { setRemoveRelationHandler, setBaselinesForPanel } from '@/c
 import MilestonePanel, { setMilestoneDateHandler } from '@/components/MilestonePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useLinearData } from '@/hooks/useLinearData';
-import type { DraftChange } from '@/hooks/draft';
+import { confirmDiscardDraft, type DraftChange } from '@/hooks/draft';
 import { usePlanningHistory } from '@/hooks/usePlanningHistory';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -124,6 +124,12 @@ function GanttView({
     [cycleStatus, tasks, logStatusTransition, draft],
   );
 
+  // Header mode button: Instant Sync Mode <-> Draft Mode (asks before dropping draft changes)
+  const toggleDraft = useCallback(() => {
+    if (!draft) startDraft();
+    else if (confirmDiscardDraft(draft)) discardDraft();
+  }, [draft, startDraft, discardDraft]);
+
   // Apply draft changes to Linear, then log the ones that went through
   const applyDraftWithHistory = useCallback(
     async (keys: string[]) => {
@@ -200,7 +206,7 @@ function GanttView({
         projectId={selectedProjectId}
         tasks={filteredTasks}
         draftActive={!!draft}
-        onStartDraft={selectedProjectId ? startDraft : undefined}
+        onToggleDraft={selectedProjectId ? toggleDraft : undefined}
       />
 
       {draft && (
