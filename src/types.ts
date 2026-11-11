@@ -95,6 +95,11 @@ export interface Filters {
   /** Label id, or '' for any label */
   label: string;
   priorities: Set<number>;
+  /**
+   * When bars are colored by a label group (e.g. Area): label ids whose issues are hidden.
+   * '' stands for issues with no label in that group.
+   */
+  hiddenColorLabels: Set<string>;
   search: string;
   dateFrom: string;
   dateTo: string;

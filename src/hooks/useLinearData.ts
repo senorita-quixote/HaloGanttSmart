@@ -69,6 +69,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
     status: '',
     label: '',
     priorities: new Set(DEFAULT_PRIORITIES),
+    hiddenColorLabels: new Set(),
     search: '',
     dateFrom: '',
     dateTo: '',
@@ -139,6 +140,8 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
   const setColorByGroup = useCallback((group: string) => {
     setColorByGroupState(group);
     localStorage.setItem('gantt_color_by_group', group);
+    // The color chips switch between priorities and the group's labels, so start them fresh
+    setFilters((f) => ({ ...f, priorities: new Set(DEFAULT_PRIORITIES), hiddenColorLabels: new Set() }));
   }, []);
 
   // Custom display order (uuids), persisted per project. Empty = default sort from the API.
@@ -172,13 +175,17 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
       if (filters.assignee && t.assignee !== filters.assignee) return false;
       if (filters.status && t.status !== filters.status) return false;
       if (filters.label && !t.labels?.some((l) => l.id === filters.label)) return false;
+      if (colorByGroup && filters.hiddenColorLabels.size > 0) {
+        const colorLabel = t.labels?.find((l) => l.groupName === colorByGroup)?.id ?? '';
+        if (filters.hiddenColorLabels.has(colorLabel)) return false;
+      }
       if (filters.search) {
         const hay = `${t.id} ${t.title} ${t.assignee} ${t.status}`.toLowerCase();
         if (!hay.includes(filters.search.toLowerCase())) return false;
       }
       return true;
     });
-  }, [orderedTasks, filters]);
+  }, [orderedTasks, filters, colorByGroup]);
 
   // Move a task next to another in the display order and persist it.
   const reorderTask = useCallback(
@@ -315,7 +322,7 @@ export function useLinearData(linearToken: string, onAuthError?: () => void) {
     (id: string) => {
       setSelectedProjectId(id);
       localStorage.setItem('linear_selected_project', id);
-      setFilters({ assignee: '', status: '', label: '', priorities: new Set(DEFAULT_PRIORITIES), search: '', dateFrom: '', dateTo: '' });
+      setFilters({ assignee: '', status: '', label: '', priorities: new Set(DEFAULT_PRIORITIES), hiddenColorLabels: new Set(), search: '', dateFrom: '', dateTo: '' });
       undoStackRef.current = []; // Clear undo on project switch
       loadIssues(id);
     },

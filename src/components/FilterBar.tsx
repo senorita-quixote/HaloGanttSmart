@@ -150,6 +150,19 @@ export default function FilterBar({
     onFiltersChange({ ...filters, priorities: next });
   };
 
+  // When bars are colored by a label group, the chips filter by that group's labels instead of priority
+  const colorGroup = colorByGroup ? labelGroups.find((g) => g.id && g.name === colorByGroup) : undefined;
+  const colorChips = colorGroup
+    ? [...colorGroup.labels, { id: '', name: `No ${colorGroup.name}`, color: '#71717a' }]
+    : [];
+  const toggleColorLabel = (id: string) => {
+    const next = new Set(filters.hiddenColorLabels);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onFiltersChange({ ...filters, hiddenColorLabels: next });
+  };
+  const colorLabelsFiltered = !!colorGroup && filters.hiddenColorLabels.size > 0;
+
   const hasSearch = !!filters.search;
   const hasAssignee = !!filters.assignee;
   const hasStatus = !!filters.status;
@@ -157,7 +170,7 @@ export default function FilterBar({
   const hasLabel = !!filters.label;
   const hasDateRange = !!filters.dateFrom || !!filters.dateTo;
   const prioritiesFiltered = filters.priorities.size > 0 && filters.priorities.size < 5;
-  const anyActiveChip = hasSearch || hasAssignee || hasStatus || hasLabel || hasDateRange || prioritiesFiltered;
+  const anyActiveChip = hasSearch || hasAssignee || hasStatus || hasLabel || hasDateRange || prioritiesFiltered || colorLabelsFiltered;
 
   const clearAll = () => {
     onFiltersChange({
@@ -169,6 +182,7 @@ export default function FilterBar({
       dateFrom: '',
       dateTo: '',
       priorities: new Set([0, 1, 2, 3, 4]),
+      hiddenColorLabels: new Set(),
     });
   };
 
@@ -268,7 +282,43 @@ export default function FilterBar({
 
         <div className="w-px h-5 bg-border-primary shrink-0" />
 
-        {/* Priority chips */}
+        {/* Bar colors: priority or a label group (e.g. Area). The chips next to it follow this choice. */}
+        {onColorByGroupChange && colorByOptions.length > 1 && (
+          <CustomDropdown
+            value={colorByGroup}
+            options={colorByOptions}
+            placeholder="Color by priority"
+            placeholderIcon={<PaletteIcon />}
+            onChange={onColorByGroupChange}
+            required
+          />
+        )}
+
+        {colorGroup ? (
+          /* Label chips for the color-by group (e.g. one per Area), in the label colors */
+          <div className="flex gap-1 items-center shrink-0">
+            {colorChips.map((c) => {
+              const active = !filters.hiddenColorLabels.has(c.id);
+              return (
+                <button
+                  key={c.id || 'none'}
+                  onClick={() => toggleColorLabel(c.id)}
+                  title={active ? `Hide ${c.name}` : `Show ${c.name}`}
+                  className={`h-7 px-2.5 rounded-full text-[11px] font-medium cursor-pointer transition-all border select-none active:scale-95 whitespace-nowrap inline-flex items-center gap-1.5 ${
+                    active ? 'label-chip' : 'bg-bg-card border-border-primary text-text-muted hover:border-border-secondary hover:text-text-secondary'
+                  }`}
+                  style={active ? labelChipStyle(c.color) : undefined}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={active ? { backgroundColor: c.color } : { border: '1.5px solid currentColor' }}
+                  />
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
         <div className="flex gap-1 items-center shrink-0">
           {PRIORITY_CHIPS.map((c) => {
             const active = filters.priorities.has(c.val);
@@ -287,6 +337,7 @@ export default function FilterBar({
             );
           })}
         </div>
+        )}
 
         <div className="w-px h-5 bg-border-primary shrink-0" />
 
@@ -299,18 +350,6 @@ export default function FilterBar({
           onChange={(v) => onGroupByChange((v || 'none') as GroupBy)}
           required
         />
-
-        {/* Bar colors: priority or a label group (e.g. Area) */}
-        {onColorByGroupChange && colorByOptions.length > 1 && (
-          <CustomDropdown
-            value={colorByGroup}
-            options={colorByOptions}
-            placeholder="Color by priority"
-            placeholderIcon={<PaletteIcon />}
-            onChange={onColorByGroupChange}
-            required
-          />
-        )}
 
         {/* Date range */}
         <DateRangePicker
@@ -380,6 +419,12 @@ export default function FilterBar({
               onClear={() => onFiltersChange({ ...filters, priorities: new Set([0, 1, 2, 3, 4]) })}
             />
           )}
+          {colorLabelsFiltered && colorGroup && (
+            <ActiveChip
+              label={`${filters.hiddenColorLabels.size} ${colorGroup.name} hidden`}
+              onClear={() => onFiltersChange({ ...filters, hiddenColorLabels: new Set() })}
+            />
+          )}
           {hasDateRange && (
             <ActiveChip
               label={`${filters.dateFrom || '…'} → ${filters.dateTo || '…'}`}
@@ -396,6 +441,13 @@ export default function FilterBar({
       )}
     </div>
   );
+}
+
+/** Chip colors from a label's #rrggbb color, matching the priority chip style */
+function labelChipStyle(hex: string): React.CSSProperties {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return {};
+  // Text color comes from .label-chip in index.css (adjusted per theme so every label color stays readable)
+  return { '--chip': hex, borderColor: `${hex}99`, backgroundColor: `${hex}1f` } as React.CSSProperties;
 }
 
 function ActiveChip({ label, onClear }: { label: string; onClear: () => void }) {

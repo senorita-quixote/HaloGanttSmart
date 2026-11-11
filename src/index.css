@@ -149,6 +149,10 @@ html.light .gantt-bar.bar-overdue { background: #dc2626; }
 html.light .gantt-bar.bar-done { background: #16a34a; }
 html.light .gantt-bar::before { background: rgba(255,255,255,0.22); }
 
+/* Label filter chips (FilterBar): text in the label color, nudged toward the theme's text color */
+.label-chip { color: color-mix(in srgb, var(--chip) 70%, white); }
+html.light .label-chip { color: color-mix(in srgb, var(--chip) 75%, black); }
+
 /* Focus-visible for keyboard accessibility */
 tr:focus-visible {
   outline: 2px solid var(--color-accent);

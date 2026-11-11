@@ -24,6 +24,7 @@ export function useSharedData(shareToken: string) {
     status: '',
     label: '',
     priorities: new Set(DEFAULT_PRIORITIES),
+    hiddenColorLabels: new Set(),
     search: '',
     dateFrom: '',
     dateTo: '',
