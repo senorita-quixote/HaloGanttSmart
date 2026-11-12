@@ -225,9 +225,8 @@ export default function FilterBar({
 
   return (
     <div className="shrink-0 border-b border-border-primary bg-bg-header print:hidden relative z-20">
-      {/* Main filter row — 48px */}
-      {/* Wraps onto more lines when the window is narrow, so nothing gets cut off */}
-      <div className="min-h-12 flex flex-wrap items-center gap-2 px-4 py-2">
+      {/* Controls row. Wraps onto more lines when the window is narrow, so nothing gets cut off */}
+      <div className="min-h-12 flex flex-wrap items-center gap-2 px-4 pt-2 pb-1.5">
         {/* Search */}
         <div className="relative flex items-center shrink-0">
           <SearchIcon />
@@ -283,7 +282,7 @@ export default function FilterBar({
 
         <div className="w-px h-5 bg-border-primary shrink-0" />
 
-        {/* Bar colors: priority or a label group (e.g. Area). The chips next to it follow this choice. */}
+        {/* Bar colors: priority or a label group (e.g. Area). The chips row below follows this choice. */}
         {onColorByGroupChange && colorByOptions.length > 1 && (
           <CustomDropdown
             value={colorByGroup}
@@ -294,53 +293,6 @@ export default function FilterBar({
             required
           />
         )}
-
-        {colorGroup ? (
-          /* Label chips for the color-by group (e.g. one per Area), in the label colors */
-          <div className="flex flex-wrap gap-1 items-center">
-            {colorChips.map((c) => {
-              const active = !filters.hiddenColorLabels.has(c.id);
-              return (
-                <button
-                  key={c.id || 'none'}
-                  onClick={() => toggleColorLabel(c.id)}
-                  title={active ? `Hide ${c.name}` : `Show ${c.name}`}
-                  className={`h-7 px-2.5 rounded-full text-[11px] font-medium cursor-pointer transition-all border select-none active:scale-95 whitespace-nowrap inline-flex items-center gap-1.5 ${
-                    active ? 'label-chip' : 'bg-bg-card border-border-primary text-text-muted hover:border-border-secondary hover:text-text-secondary'
-                  }`}
-                  style={active ? labelChipStyle(c.color) : undefined}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={active ? { backgroundColor: c.color } : { border: '1.5px solid currentColor' }}
-                  />
-                  {c.name}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-        <div className="flex flex-wrap gap-1 items-center">
-          {PRIORITY_CHIPS.map((c) => {
-            const active = filters.priorities.has(c.val);
-            return (
-              <button
-                key={c.val}
-                onClick={() => togglePriority(c.val)}
-                className={`h-7 px-2.5 rounded-full text-[11px] font-medium cursor-pointer transition-all border select-none active:scale-95 ${
-                  active
-                    ? chipActiveColors[c.cls]
-                    : 'bg-bg-card border-border-primary text-text-muted hover:border-border-secondary hover:text-text-secondary'
-                }`}
-              >
-                {c.label}
-              </button>
-            );
-          })}
-        </div>
-        )}
-
-        <div className="w-px h-5 bg-border-primary shrink-0" />
 
         {/* Group by */}
         <CustomDropdown
@@ -389,6 +341,57 @@ export default function FilterBar({
         <span className="shrink-0 bg-bg-hover text-text-secondary text-[11px] font-medium font-mono tabular-nums px-2.5 h-7 rounded-full flex items-center">
           {filteredCount}/{totalCount}
         </span>
+      </div>
+
+      {/* Chips row: one chip per label of the Color by group (e.g. Area), or the priorities */}
+      <div className="flex flex-wrap items-center gap-1 px-4 pb-2">
+        <span className="text-[10.5px] uppercase tracking-wider text-text-muted font-semibold mr-1.5">
+          {colorGroup ? colorGroup.name : 'Priority'}
+        </span>
+          {colorGroup ? (
+            /* Label chips for the color-by group (e.g. one per Area), in the label colors */
+            <div className="flex flex-wrap gap-1 items-center">
+              {colorChips.map((c) => {
+                const active = !filters.hiddenColorLabels.has(c.id);
+                return (
+                  <button
+                    key={c.id || 'none'}
+                    onClick={() => toggleColorLabel(c.id)}
+                    title={active ? `Hide ${c.name}` : `Show ${c.name}`}
+                    className={`h-7 px-2.5 rounded-full text-[11px] font-medium cursor-pointer transition-all border select-none active:scale-95 whitespace-nowrap inline-flex items-center gap-1.5 ${
+                      active ? 'label-chip' : 'bg-bg-card border-border-primary text-text-muted hover:border-border-secondary hover:text-text-secondary'
+                    }`}
+                    style={active ? labelChipStyle(c.color) : undefined}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={active ? { backgroundColor: c.color } : { border: '1.5px solid currentColor' }}
+                    />
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+          <div className="flex flex-wrap gap-1 items-center">
+            {PRIORITY_CHIPS.map((c) => {
+              const active = filters.priorities.has(c.val);
+              return (
+                <button
+                  key={c.val}
+                  onClick={() => togglePriority(c.val)}
+                  className={`h-7 px-2.5 rounded-full text-[11px] font-medium cursor-pointer transition-all border select-none active:scale-95 ${
+                    active
+                      ? chipActiveColors[c.cls]
+                      : 'bg-bg-card border-border-primary text-text-muted hover:border-border-secondary hover:text-text-secondary'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+          )}
       </div>
 
       {/* Active filter chips row */}
