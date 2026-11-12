@@ -32,7 +32,7 @@ const iconBtn =
   'flex items-center justify-center w-8 h-8 rounded-md text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors cursor-pointer';
 
 const ghostBtn =
-  'flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-medium text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors cursor-pointer';
+  'flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-medium text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors cursor-pointer whitespace-nowrap shrink-0';
 
 function formatRangeLabel(tasks: Task[]): string | null {
   const dates: number[] = [];
@@ -158,7 +158,7 @@ export default memo(function Header({
 
       {/* Center: sprint/date range badge */}
       {rangeLabel && (
-        <div className="hidden md:flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-bg-hover border border-border-primary text-[11px] font-medium text-text-secondary">
+        <div className="hidden lg:flex items-center gap-1.5 h-7 px-2.5 rounded-full whitespace-nowrap shrink-0 bg-bg-hover border border-border-primary text-[11px] font-medium text-text-secondary">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -173,9 +173,9 @@ export default memo(function Header({
       <div className="flex-1" />
 
       {/* Right: actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
         {lastSynced && (
-          <span className="hidden lg:inline text-[11px] text-text-muted mr-1">
+          <span className="hidden xl:inline text-[11px] text-text-muted mr-1 whitespace-nowrap">
             Synced <span className="font-mono tabular-nums">{lastSynced}</span>
           </span>
         )}
@@ -187,7 +187,7 @@ export default memo(function Header({
             aria-pressed={draftActive}
             className={
               draftActive
-                ? 'flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-semibold bg-amber-400/15 text-amber-600 border border-amber-400/40 hover:bg-amber-400/25 transition-colors cursor-pointer'
+                ? 'flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs font-semibold whitespace-nowrap shrink-0 bg-amber-400/15 text-amber-600 border border-amber-400/40 hover:bg-amber-400/25 transition-colors cursor-pointer'
                 : ghostBtn
             }
             title={
@@ -206,7 +206,10 @@ export default memo(function Header({
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
               </svg>
             )}
-            <span className="hidden md:inline">{draftActive ? 'Draft Mode' : 'Instant Sync Mode'}</span>
+            {/* Draft Mode stays labeled (it's a state to notice); the default mode shows just the icon on smaller screens */}
+            <span className={draftActive ? 'hidden md:inline' : 'hidden xl:inline'}>
+              {draftActive ? 'Draft Mode' : 'Instant Sync Mode'}
+            </span>
           </button>
         )}
 
@@ -340,7 +343,7 @@ export default memo(function Header({
 
         {isLocalMode ? (
           <span
-            className="px-2 h-6 flex items-center rounded text-[10px] font-medium uppercase tracking-wide text-text-secondary border border-border-primary"
+            className="px-2 h-6 flex items-center rounded whitespace-nowrap shrink-0 text-[10px] font-medium uppercase tracking-wide text-text-secondary border border-border-primary"
             title="Running with VITE_LINEAR_API_KEY. Share links and Plan vs Actual need Supabase."
           >
             Local mode

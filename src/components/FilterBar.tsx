@@ -226,7 +226,8 @@ export default function FilterBar({
   return (
     <div className="shrink-0 border-b border-border-primary bg-bg-header print:hidden relative z-20">
       {/* Main filter row — 48px */}
-      <div className="h-12 flex items-center gap-2 px-4">
+      {/* Wraps onto more lines when the window is narrow, so nothing gets cut off */}
+      <div className="min-h-12 flex flex-wrap items-center gap-2 px-4 py-2">
         {/* Search */}
         <div className="relative flex items-center shrink-0">
           <SearchIcon />
@@ -296,7 +297,7 @@ export default function FilterBar({
 
         {colorGroup ? (
           /* Label chips for the color-by group (e.g. one per Area), in the label colors */
-          <div className="flex gap-1 items-center shrink-0">
+          <div className="flex flex-wrap gap-1 items-center">
             {colorChips.map((c) => {
               const active = !filters.hiddenColorLabels.has(c.id);
               return (
@@ -319,7 +320,7 @@ export default function FilterBar({
             })}
           </div>
         ) : (
-        <div className="flex gap-1 items-center shrink-0">
+        <div className="flex flex-wrap gap-1 items-center">
           {PRIORITY_CHIPS.map((c) => {
             const active = filters.priorities.has(c.val);
             return (
