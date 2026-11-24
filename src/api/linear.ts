@@ -198,6 +198,7 @@ export async function fetchIssues(
             assignee { name }
             team { id }
             projectMilestone { id }
+            parent { identifier }
             labels(first: 20) { nodes { id name color parent { id name } } }
           }
         }
@@ -216,6 +217,7 @@ export async function fetchIssues(
             assignee { name }
             team { id }
             projectMilestone { id }
+            parent { identifier }
             labels(first: 20) { nodes { id name color parent { id name } } }
           }
         }
@@ -238,6 +240,7 @@ export async function fetchIssues(
     assignee: { name: string } | null;
     team: { id: string } | null;
     projectMilestone: { id: string } | null;
+    parent?: { identifier: string } | null;
     labels?: {
       nodes: Array<{ id: string; name: string; color: string; parent: { id: string; name: string } | null }>;
     };
@@ -377,6 +380,7 @@ export async function fetchIssues(
       completedAt: n.completedAt || undefined,
       isDueImplicit: isDueImplicit || undefined,
       milestoneId: n.projectMilestone?.id ?? null,
+      parentId: n.parent?.identifier ?? null,
       labels: (n.labels?.nodes || []).map((l) => ({
         id: l.id,
         name: l.name,

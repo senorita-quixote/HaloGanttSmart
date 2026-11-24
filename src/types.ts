@@ -22,6 +22,8 @@ export interface Task {
   isDueImplicit?: boolean;
   /** Linear project milestone this issue belongs to, if any */
   milestoneId?: string | null;
+  /** Identifier (e.g. "SEED-12") of the parent issue, if this is a sub-issue */
+  parentId?: string | null;
   /** Issue labels. Undefined when the data source doesn't include them (e.g. shared views). */
   labels?: TaskLabel[];
 }
