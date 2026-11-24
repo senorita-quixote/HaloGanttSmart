@@ -58,6 +58,63 @@ function groupTasks(tasks: Task[], groupBy: GroupBy): { key: string; label: stri
     .map(([key, tasks]) => ({key, label: key, tasks}));
 }
 
+interface NestedRow {
+  task: Task;
+  depth: number;
+  /** Number of sub-issues nested directly under this row */
+  childCount: number;
+  /** Set when the parent exists but isn't in this list (filtered out, done, or in another group) */
+  orphanParentId?: string;
+}
+
+/**
+ * Order tasks as a tree: each sub-issue follows its parent, indented one level.
+ * Sibling order follows the incoming order. Sub-issues whose parent isn't in the
+ * list stay at the top level. Children of collapsed parents are left out.
+ */
+function nestSubIssues(tasks: Task[], collapsedParents: Set<string>): NestedRow[] {
+  const ids = new Set(tasks.map((t) => t.id));
+  const childrenOf = new Map<string, Task[]>();
+  const roots: Task[] = [];
+  for (const t of tasks) {
+    if (t.parentId && t.parentId !== t.id && ids.has(t.parentId)) {
+      if (!childrenOf.has(t.parentId)) childrenOf.set(t.parentId, []);
+      childrenOf.get(t.parentId)!.push(t);
+    } else {
+      roots.push(t);
+    }
+  }
+
+  const rows: NestedRow[] = [];
+  const seen = new Set<string>();
+  const visit = (t: Task, depth: number) => {
+    if (seen.has(t.id)) return; // guard against parent cycles
+    seen.add(t.id);
+    const kids = childrenOf.get(t.id) || [];
+    rows.push({
+      task: t,
+      depth,
+      childCount: kids.length,
+      orphanParentId: depth === 0 && t.parentId ? t.parentId : undefined,
+    });
+    if (collapsedParents.has(t.id)) {
+      // Still mark descendants as seen so they don't resurface as roots
+      const hide = (k: Task) => {
+        if (seen.has(k.id)) return;
+        seen.add(k.id);
+        (childrenOf.get(k.id) || []).forEach(hide);
+      };
+      kids.forEach(hide);
+      return;
+    }
+    for (const k of kids) visit(k, depth + 1);
+  };
+  roots.forEach((t) => visit(t, 0));
+  // Anything left (only possible with a parent cycle) goes at the top level
+  for (const t of tasks) if (!seen.has(t.id)) visit(t, 0);
+  return rows;
+}
+
 // Resize handle component
 function ResizeHandle({onResize}: { onResize: (delta: number) => void }) {
   const handleMouseDown = useCallback(
@@ -113,6 +170,15 @@ export default function GanttChart({
                                      dateTo,
                                    }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set());
+  const toggleParent = useCallback((taskId: string) => {
+    setCollapsedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }, []);
   const [doneVisible, setDoneVisible] = useState(false);
   const [unscheduledVisible, setUnscheduledVisible] = useState(true);
   const [colWidths, setColWidths] = useState<ColumnWidths>(DEFAULT_WIDTHS);
@@ -742,6 +808,8 @@ export default function GanttChart({
               showHeader={groupBy !== 'none'}
               isCollapsed={collapsed.has(group.key)}
               onToggle={() => toggleCollapse(group.key)}
+              collapsedParents={collapsedParents}
+              onToggleParent={toggleParent}
               chartStart={chartStart}
               totalDays={totalDays}
               today={today}
@@ -1008,6 +1076,8 @@ function GroupRows({
                      showHeader,
                      isCollapsed,
                      onToggle,
+                     collapsedParents,
+                     onToggleParent,
                      chartStart,
                      totalDays,
                      today,
@@ -1029,6 +1099,8 @@ function GroupRows({
   showHeader: boolean;
   isCollapsed: boolean;
   onToggle: () => void;
+  collapsedParents: Set<string>;
+  onToggleParent: (taskId: string) => void;
   chartStart: Date;
   totalDays: number;
   today: Date;
@@ -1045,6 +1117,7 @@ function GroupRows({
   colorByGroup?: string;
   onReorder?: (draggedUuid: string, targetUuid: string, placeAfter: boolean) => void;
 }) {
+  const rows = useMemo(() => nestSubIssues(group.tasks, collapsedParents), [group.tasks, collapsedParents]);
   return (
     <>
       {showHeader && (
@@ -1076,10 +1149,15 @@ function GroupRows({
         </tr>
       )}
       {!isCollapsed &&
-        group.tasks.map((task) => (
+        rows.map(({task, depth, childCount, orphanParentId}) => (
           <GanttRow
             key={task.id}
             task={task}
+            depth={depth}
+            subIssueCount={childCount}
+            subIssuesCollapsed={collapsedParents.has(task.id)}
+            onToggleSubIssues={childCount > 0 ? () => onToggleParent(task.id) : undefined}
+            orphanParentId={orphanParentId}
             chartStart={chartStart}
             totalDays={totalDays}
             today={today}

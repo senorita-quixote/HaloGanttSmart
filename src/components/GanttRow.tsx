@@ -36,7 +36,17 @@ interface Props {
   /** Label group name whose label colors the bar (e.g. "Area"); falls back to priority colors */
   colorByGroup?: string;
   onReorder?: (draggedUuid: string, targetUuid: string, placeAfter: boolean) => void;
+  /** Nesting level: 0 for top-level issues, 1+ for sub-issues shown under their parent */
+  depth?: number;
+  /** Number of sub-issues nested directly under this row */
+  subIssueCount?: number;
+  subIssuesCollapsed?: boolean;
+  onToggleSubIssues?: () => void;
+  /** Parent identifier when this is a sub-issue whose parent isn't shown in the list */
+  orphanParentId?: string;
 }
+
+const INDENT_PX = 22;
 
 const REORDER_MIME = 'application/x-gantt-task';
 
@@ -58,6 +68,11 @@ export default function GanttRow({
   isDone,
   colorByGroup,
   onReorder,
+  depth = 0,
+  subIssueCount = 0,
+  subIssuesCollapsed = false,
+  onToggleSubIssues,
+  orphanParentId,
 }: Props) {
   const pCls = priorityClass(task.priorityVal);
   const groupColor = colorByGroup ? labelColorInGroup(task, colorByGroup) : undefined;
@@ -475,9 +490,55 @@ export default function GanttRow({
               </svg>
             </span>
           )}
+          {depth > 0 && <span className="shrink-0 -mr-2.5" style={{ width: depth * INDENT_PX }} aria-hidden="true" />}
+          {/* Fixed slot so avatars line up: sub-issue toggle, tree connector, or empty */}
+          {onToggleSubIssues ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSubIssues();
+              }}
+              className="shrink-0 w-[18px] h-[18px] -mr-1 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors cursor-pointer"
+              title={`${subIssuesCollapsed ? 'Show' : 'Hide'} ${subIssueCount} sub-issue${subIssueCount === 1 ? '' : 's'}`}
+              aria-expanded={!subIssuesCollapsed}
+              aria-label={`${subIssuesCollapsed ? 'Show' : 'Hide'} sub-issues of ${task.id}`}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="transition-transform duration-150"
+                style={{ transform: subIssuesCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          ) : (
+            <span className="shrink-0 w-[18px] -mr-1 flex items-center justify-center text-border-secondary" aria-hidden="true">
+              {depth > 0 && (
+                // Tree connector: └
+                <svg width="14" height="20" viewBox="0 0 14 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M3 0 V11 Q3 13 5 13 H13" />
+                </svg>
+              )}
+            </span>
+          )}
           <Avatar name={task.assignee} size="sm" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
+              {orphanParentId && (
+                <span
+                  className="font-mono text-[9px] text-text-muted shrink-0 px-1 rounded bg-bg-hover"
+                  title={`Sub-issue of ${orphanParentId} (parent not shown)`}
+                >
+                  ↳ {orphanParentId}
+                </span>
+              )}
               <a
                 href={isSafeUrl(task.url) ? task.url : '#'}
                 target="_blank"
@@ -532,8 +593,8 @@ export default function GanttRow({
               )}
             </div>
             <div
-              className={`text-[13px] font-medium text-text-primary leading-snug truncate ${isDone ? 'line-through opacity-70' : ''}`}
-              style={{ maxWidth: colWidths.task - 60 }}
+              className={`text-[13px] ${subIssueCount > 0 ? 'font-semibold' : 'font-medium'} text-text-primary leading-snug truncate ${isDone ? 'line-through opacity-70' : ''}`}
+              style={{ maxWidth: colWidths.task - 74 - depth * INDENT_PX }}
               title={task.title}
             >
               {task.title}
@@ -629,7 +690,7 @@ export default function GanttRow({
           {/* Main bar */}
           <div
             data-task-bar={task.id}
-            className={`gantt-bar absolute h-[28px] rounded-md top-1/2 -translate-y-1/2 flex items-center ${barIsNarrow ? 'justify-center' : 'justify-start pl-2.5'} text-[10.5px] font-bold text-white/95 z-[2] min-w-[20px] transition-[filter,box-shadow] duration-150 hover:brightness-115 ${isDone ? 'bar-done' : overdue ? 'bar-overdue animate-pulse-bar' : `bar-${pCls}`} ${isAnyDrag ? '!transition-none opacity-80' : ''} ${isConnecting ? 'ring-2 ring-accent/40 ring-offset-1 ring-offset-transparent' : ''} ${task.isDueImplicit ? 'opacity-75' : ''} ${onReschedule || onRescheduleStart ? (isMoving ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer'}`}
+            className={`gantt-bar absolute ${depth > 0 ? 'h-[22px]' : 'h-[28px]'} rounded-md top-1/2 -translate-y-1/2 flex items-center ${barIsNarrow ? 'justify-center' : 'justify-start pl-2.5'} text-[10.5px] font-bold text-white/95 z-[2] min-w-[20px] transition-[filter,box-shadow] duration-150 hover:brightness-115 ${isDone ? 'bar-done' : overdue ? 'bar-overdue animate-pulse-bar' : `bar-${pCls}`} ${isAnyDrag ? '!transition-none opacity-80' : ''} ${isConnecting ? 'ring-2 ring-accent/40 ring-offset-1 ring-offset-transparent' : ''} ${task.isDueImplicit ? 'opacity-75' : ''} ${onReschedule || onRescheduleStart ? (isMoving ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer'}`}
             style={{
               left: 0,
               width: displayBarWidth,
